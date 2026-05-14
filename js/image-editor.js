@@ -13,8 +13,8 @@ class ImageEditor {
         this.skillList = document.getElementById('skillList');
         this.clearBtn = document.getElementById('clearBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
-        this.copyBtn = document.getElementById('copyBtn');
         this.toast = document.getElementById('toast');
+        this.sidebar = document.querySelector('.sidebar');
 
         // State management
         this.draggableImages = new Map();
@@ -22,14 +22,15 @@ class ImageEditor {
         this.dragOffset = { x: 0, y: 0 };
         this.currentScene = null;
         this.currentSceneImage = null;
+        this.skillSize = 48;
 
         this.scenePath = './imgs/scenes/';
         this.skillPath = './imgs/skills/';
 
         this.sceneFiles = [
-            'right.png',
-            'horntail.png',
-            "Map_Horntail's_Cave.png"
+            '002-right_head.png',
+            "003-horntail.png",
+            '004-horntail-with-mob.png'
         ];
 
         this.skillFiles = [
@@ -66,27 +67,106 @@ class ImageEditor {
      * Initialize the application
      */
     init() {
+        this.setupFixedSidebarSpacing();
         this.setupCanvas();
         this.loadScenes();
         this.loadSkills();
         this.attachEventListeners();
-        this.showToast('Select a scene, then click skills to place them.', 'info');
+        this.showToast('Select a scene, then drag skills onto the canvas to place them.', 'info');
     }
+
+    /**
+     * Keep main content below the fixed top sidebar
+     */
+    setupFixedSidebarSpacing() {
+        const updateSidebarHeight = () => {
+            const sidebarHeight = this.sidebar?.getBoundingClientRect().height || 0;
+            document.documentElement.style.setProperty('--sidebar-height', `${sidebarHeight}px`);
+        };
+
+        updateSidebarHeight();
+        window.addEventListener('resize', updateSidebarHeight);
+
+        if ('ResizeObserver' in window && this.sidebar) {
+            const observer = new ResizeObserver(updateSidebarHeight);
+            observer.observe(this.sidebar);
+        }
+    }
+// ... existing code ...
 
     /**
      * Setup canvas and background
      */
     setupCanvas() {
-        const wrapper = this.canvas.parentElement;
         const resizeCanvas = () => {
-            this.canvas.width = wrapper.clientWidth;
-            this.canvas.height = wrapper.clientHeight;
-            this.drawBackground();
-            this.keepAllSkillsWithinCanvas();
+            this.resizeCanvasToScene();
         };
 
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', resizeCanvas);
+    }
+
+    /**
+     * Resize canvas to exactly match the rendered background image size
+     */
+    resizeCanvasToScene() {
+        const previousWidth = this.canvas.width;
+        const previousHeight = this.canvas.height;
+
+        if (!this.currentSceneImage) {
+            this.canvas.width = 1;
+            this.canvas.height = 1;
+            this.canvasOverlay.style.width = '1px';
+            this.canvasOverlay.style.height = '1px';
+            return;
+        }
+
+        const image = this.currentSceneImage;
+        const sidebarHeight = this.sidebar?.getBoundingClientRect().height || 0;
+        const availableWidth = window.innerWidth;
+        const availableHeight = Math.max(1, window.innerHeight - sidebarHeight - 48);
+
+        this.sceneScale = Math.min(
+            availableWidth / image.naturalWidth,
+            availableHeight / image.naturalHeight,
+            1
+        );
+
+        const nextWidth = Math.floor(image.naturalWidth * this.sceneScale);
+        const nextHeight = Math.floor(image.naturalHeight * this.sceneScale);
+
+        if (previousWidth > 1 && previousHeight > 1) {
+            this.scaleSkillPositions(previousWidth, previousHeight, nextWidth, nextHeight);
+        }
+
+        this.canvas.width = nextWidth;
+        this.canvas.height = nextHeight;
+
+        this.canvas.style.width = `${nextWidth}px`;
+        this.canvas.style.height = `${nextHeight}px`;
+
+        this.canvasOverlay.style.width = `${nextWidth}px`;
+        this.canvasOverlay.style.height = `${nextHeight}px`;
+
+        this.drawBackground();
+        this.keepAllSkillsWithinCanvas();
+    }
+
+    /**
+     * Keep placed skills visually aligned when the canvas changes size
+     */
+    scaleSkillPositions(previousWidth, previousHeight, nextWidth, nextHeight) {
+        const scaleX = nextWidth / previousWidth;
+        const scaleY = nextHeight / previousHeight;
+
+        this.draggableImages.forEach((data) => {
+            data.x *= scaleX;
+            data.y *= scaleY;
+
+            data.element.style.left = `${data.x}px`;
+            data.element.style.top = `${data.y}px`;
+        });
     }
 
     /**
@@ -94,22 +174,42 @@ class ImageEditor {
      */
     drawBackground() {
         const ctx = this.canvas.getContext('2d');
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
 
-        ctx.clearRect(0, 0, w, h);
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
         if (!this.currentSceneImage) {
             ctx.fillStyle = '#1f2937';
-            ctx.fillRect(0, 0, w, h);
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
             return;
         }
+        //
+        // const image = this.currentSceneImage;
+        // const sidebarHeight = this.sidebar?.getBoundingClientRect().height || 0;
+        //
+        // const maxViewportWidth = window.innerWidth;
+        // const maxViewportHeight = Math.max(0, (window.innerHeight - sidebarHeight));
+        //
+        // const maxDrawWidth = Math.min(canvasWidth, maxViewportWidth);
+        // const maxDrawHeight = Math.min(canvasHeight, maxViewportHeight);
+        //
+        // const scale = Math.min(
+        //     maxDrawWidth / image.naturalWidth,
+        //     maxDrawHeight / image.naturalHeight
+        // );
+        //
+        // const drawWidth = Math.floor(image.naturalWidth * scale);
+        // const drawHeight = Math.floor(image.naturalHeight * scale);
+        // const drawX = Math.floor((canvasWidth - drawWidth) / 2);
+        //
+        // ctx.imageSmoothingEnabled = true;
+        // ctx.imageSmoothingQuality = 'high';
+        // ctx.drawImage(image, drawX, 0, drawWidth, drawHeight);
 
-        const image = this.currentSceneImage;
-        const drawX = Math.floor((w - image.naturalWidth) / 2);
-        const drawY = Math.floor((h - image.naturalHeight) / 2);
-
-        ctx.drawImage(image, drawX, drawY);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(this.currentSceneImage, 0, 0, canvasWidth, canvasHeight);
     }
 
     /**
@@ -193,11 +293,14 @@ class ImageEditor {
         dragImage.style.position = 'absolute';
         dragImage.style.top = '-1000px';
         dragImage.style.left = '-1000px';
+        dragImage.style.width = `${this.skillSize}px`;
+        dragImage.style.height = `${this.skillSize}px`;
+        dragImage.style.objectFit = 'contain';
         dragImage.style.pointerEvents = 'none';
 
         document.body.appendChild(dragImage);
 
-        e.dataTransfer.setDragImage(dragImage, 16, 16);
+        e.dataTransfer.setDragImage(dragImage, this.skillSize / 2, this.skillSize / 2);
 
         setTimeout(() => {
             dragImage.remove();
@@ -216,7 +319,9 @@ class ImageEditor {
                 url: imageUrl
             };
             this.currentSceneImage = image;
-            this.drawBackground();
+            this.resizeCanvasToScene();
+            // this.drawBackground();
+            // this.keepAllSkillsWithinCanvas();
 
             document.querySelectorAll('.scene-item').forEach(item => {
                 item.classList.toggle(
@@ -262,7 +367,6 @@ class ImageEditor {
         // Controls
         this.clearBtn.addEventListener('click', () => this.clearCanvas());
         this.downloadBtn.addEventListener('click', () => this.downloadComposition());
-        this.copyBtn.addEventListener('click', () => this.copyCompositionData());
 
         // Canvas click to deselect
         this.canvasOverlay.addEventListener('click', (e) => {
@@ -286,8 +390,8 @@ class ImageEditor {
         imageContainer.id = imageId;
         imageContainer.className = 'draggable-image';
 
-        const width = 64;
-        const height = 64;
+        const width = this.skillSize;
+        const height = this.skillSize;
         const startX = typeof x === 'number' ? x - width / 2 : overlayRect.width / 2 - width / 2;
         const startY = typeof y === 'number' ? y - height / 2 : overlayRect.height / 2 - height / 2;
 
@@ -328,7 +432,6 @@ class ImageEditor {
 
         this.attachImageDragListeners(imageId);
         this.selectImage(imageId);
-        this.showToast(`Added ${this.formatImageName(imageName)}`, 'success');
     }
 
     /**
@@ -463,7 +566,6 @@ class ImageEditor {
             if (this.selectedImage === imageId) {
                 this.selectedImage = null;
             }
-            this.showToast(`Removed ${this.formatImageName(data.name)}`, 'info');
         }
     }
 
@@ -539,33 +641,6 @@ class ImageEditor {
         link.click();
 
         this.showToast('Planner image downloaded!', 'success');
-    }
-
-    /**
-     * Copy composition data as JSON
-     */
-    copyCompositionData() {
-        const data = {
-            timestamp: new Date().toISOString(),
-            scene: this.currentScene,
-            skills: Array.from(this.draggableImages.entries()).map(([id, img]) => ({
-                id,
-                name: img.name,
-                src: img.data,
-                x: img.x,
-                y: img.y,
-                width: img.width,
-                height: img.height
-            }))
-        };
-
-        const jsonString = JSON.stringify(data, null, 2);
-
-        navigator.clipboard.writeText(jsonString).then(() => {
-            this.showToast('Planner data copied to clipboard!', 'success');
-        }).catch(() => {
-            this.showToast('Failed to copy planner data', 'error');
-        });
     }
 
     /**
