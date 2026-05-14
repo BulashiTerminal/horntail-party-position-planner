@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Draggable Image Editor - Create beautiful image compositions">
+    <meta name="theme-color" content="#667eea">
+    <title>Draggable Image Editor</title>
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Sidebar Menu -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>🖼️ Images</h2>
+            </div>
+            <div class="image-library">
+                <div class="library-section">
+                    <h3>Default Library</h3>
+                    <div class="image-list" id="imageList">
+                        <!-- Images loaded dynamically -->
+                    </div>
+                </div>
+                <div class="library-section">
+                    <h3>📤 Upload Custom</h3>
+                    <input type="file" id="fileInput" accept="image/*" multiple>
+                    <button id="uploadBtn" class="upload-btn">Choose Images</button>
+                </div>
+                <div class="library-section shortcuts">
+                    <h3>⌨️ Shortcuts</h3>
+                    <div class="shortcuts-list">
+                        <div class="shortcut"><kbd>Delete</kbd> Remove selected</div>
+                        <div class="shortcut"><kbd>+</kbd> Increase size</div>
+                        <div class="shortcut"><kbd>-</kbd> Decrease size</div>
+                        <div class="shortcut"><kbd>Esc</kbd> Deselect</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Canvas Area -->
+        <main class="main-content">
+            <div class="canvas-wrapper">
+                <canvas id="canvas"></canvas>
+                <div class="canvas-overlay" id="canvasOverlay">
+                    <!-- Draggable images will be placed here -->
+                </div>
+            </div>
+            <div class="controls">
+                <button id="clearBtn" class="btn btn-danger" title="Clear all images">Clear Canvas</button>
+                <button id="copyBtn" class="btn btn-info" title="Copy composition data">Copy Data</button>
+                <button id="downloadBtn" class="btn btn-primary" title="Download as PNG">Download</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Scripts -->
+    <script src="./js/image-editor.js"></script>
+</body>
+</html>
