@@ -9,9 +9,8 @@ class ImageEditor {
         // Canvas & DOM elements
         this.canvas = document.getElementById('canvas');
         this.canvasOverlay = document.getElementById('canvasOverlay');
-        this.imageList = document.getElementById('imageList');
-        this.fileInput = document.getElementById('fileInput');
-        this.uploadBtn = document.getElementById('uploadBtn');
+        this.sceneList = document.getElementById('sceneList');
+        this.skillList = document.getElementById('skillList');
         this.clearBtn = document.getElementById('clearBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
         this.copyBtn = document.getElementById('copyBtn');
@@ -21,16 +20,43 @@ class ImageEditor {
         this.draggableImages = new Map();
         this.selectedImage = null;
         this.dragOffset = { x: 0, y: 0 };
-        this.isDrawing = false;
+        this.currentScene = null;
+        this.currentSceneImage = null;
 
-        // Default SVG-based images (no external dependencies)
-        this.defaultImages = [
-            { name: 'Mountain', svg: this.createMountainSVG() },
-            { name: 'Forest', svg: this.createForestSVG() },
-            { name: 'Ocean', svg: this.createOceanSVG() },
-            { name: 'Desert', svg: this.createDesertSVG() },
-            { name: 'Sunset', svg: this.createSunsetSVG() },
-            { name: 'Snow', svg: this.createSnowSVG() }
+        this.scenePath = './imgs/scenes/';
+        this.skillPath = './imgs/skills/';
+
+        this.sceneFiles = [
+            'right.png',
+            'horntail.png',
+            "Map_Horntail's_Cave.png"
+        ];
+
+        this.skillFiles = [
+            'sk_03074.png',
+            'sk_04004.png',
+            'sk_04009.png',
+            'sk_04015.png',
+            'sk_04022.png',
+            'sk_04023.png',
+            'sk_04025.png',
+            'sk_04026.png',
+            'sk_04027.png',
+            'sk_04029.png',
+            'sk_04030.png',
+            'sk_04033.png',
+            'sk_04035.png',
+            'sk_04039.png',
+            'sk_04040.png',
+            'sk_04043.png',
+            'sk_04044.png',
+            'sk_04045.png',
+            'sk_04053.png',
+            'sk_04054.png',
+            'sk_04055.png',
+            'sk_04058.png',
+            'sk_04065.png',
+            'sk_04070.png'
         ];
 
         this.init();
@@ -41,9 +67,10 @@ class ImageEditor {
      */
     init() {
         this.setupCanvas();
-        this.loadDefaultImages();
+        this.loadScenes();
+        this.loadSkills();
         this.attachEventListeners();
-        this.showToast('Welcome to Image Editor! Drag images onto the canvas.', 'info');
+        this.showToast('Select a scene, then click skills to place them.', 'info');
     }
 
     /**
@@ -55,6 +82,7 @@ class ImageEditor {
             this.canvas.width = wrapper.clientWidth;
             this.canvas.height = wrapper.clientHeight;
             this.drawBackground();
+            this.keepAllSkillsWithinCanvas();
         };
 
         resizeCanvas();
@@ -62,120 +90,155 @@ class ImageEditor {
     }
 
     /**
-     * Draw gradient background with decorative elements
+     * Draw current scene background
      */
     drawBackground() {
         const ctx = this.canvas.getContext('2d');
         const w = this.canvas.width;
         const h = this.canvas.height;
 
-        // Main gradient
-        const gradient = ctx.createLinearGradient(0, 0, w, h);
-        gradient.addColorStop(0, '#667eea');
-        gradient.addColorStop(0.5, '#764ba2');
-        gradient.addColorStop(1, '#f093fb');
+        ctx.clearRect(0, 0, w, h);
 
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, w, h);
-
-        // Decorative circles
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-        for (let i = 0; i < 5; i++) {
-            ctx.beginPath();
-            ctx.arc(
-                Math.random() * w,
-                Math.random() * h,
-                Math.random() * 150 + 50,
-                0,
-                Math.PI * 2
-            );
-            ctx.fill();
+        if (!this.currentSceneImage) {
+            ctx.fillStyle = '#1f2937';
+            ctx.fillRect(0, 0, w, h);
+            return;
         }
+
+        const image = this.currentSceneImage;
+        const drawX = Math.floor((w - image.naturalWidth) / 2);
+        const drawY = Math.floor((h - image.naturalHeight) / 2);
+
+        ctx.drawImage(image, drawX, drawY);
     }
 
     /**
-     * Load default images to library
+     * Load scene thumbnails
      */
-    loadDefaultImages() {
-        this.defaultImages.forEach(image => {
-            this.addImageToLibrary(image.name, image.svg, true);
+    loadScenes() {
+        this.sceneFiles.forEach((fileName, index) => {
+            const imageUrl = `${this.scenePath}${fileName}`;
+            this.addSceneToLibrary(fileName, imageUrl);
+
+            if (index === 0) {
+                this.setScene(imageUrl, fileName);
+            }
         });
     }
 
     /**
-     * Add image item to sidebar library
+     * Load skill thumbnails
      */
-    addImageToLibrary(name, imageData, isSVG = false) {
-        const imageItem = document.createElement('div');
-        imageItem.className = 'image-item';
-        imageItem.draggable = true;
-
-        const container = document.createElement('div');
-        container.style.width = '100%';
-        container.style.height = '100%';
-        container.style.display = 'flex';
-        container.style.alignItems = 'center';
-        container.style.justifyContent = 'center';
-
-        if (isSVG) {
-            // Insert SVG directly
-            container.innerHTML = imageData;
-        } else {
-            // Load image
-            const img = document.createElement('img');
-            img.src = imageData;
-            img.alt = name;
-            container.appendChild(img);
-        }
-
-        const label = document.createElement('div');
-        label.className = 'image-item-label';
-        label.textContent = name;
-
-        imageItem.appendChild(container);
-        imageItem.appendChild(label);
-
-        imageItem.addEventListener('dragstart', (e) => this.handleDragStart(e, imageData, name, isSVG));
-
-        this.imageList.appendChild(imageItem);
+    loadSkills() {
+        this.skillFiles.forEach(fileName => {
+            const imageUrl = `${this.skillPath}${fileName}`;
+            this.addSkillToLibrary(fileName, imageUrl);
+        });
     }
 
     /**
-     * Handle drag start from library
+     * Add scene item to sidebar
      */
-    handleDragStart(e, imageData, imageName, isSVG) {
+    addSceneToLibrary(name, imageUrl) {
+        const sceneItem = document.createElement('button');
+        sceneItem.type = 'button';
+        sceneItem.className = 'image-item scene-item';
+
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = name;
+
+        sceneItem.appendChild(img);
+
+        sceneItem.addEventListener('click', () => {
+            this.setScene(imageUrl, name);
+        });
+
+        this.sceneList.appendChild(sceneItem);
+    }
+
+    /**
+     * Add skill item to sidebar
+     */
+    addSkillToLibrary(name, imageUrl) {
+        const skillItem = document.createElement('button');
+        skillItem.type = 'button';
+        skillItem.className = 'image-item skill-item';
+        skillItem.draggable = true;
+
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = name;
+        img.draggable = false;
+
+        skillItem.appendChild(img);
+
+        skillItem.addEventListener('dragstart', (e) => {
+            this.handleSkillDragStart(e, imageUrl, name);
+        });
+
+        this.skillList.appendChild(skillItem);
+    }
+
+    /**
+     * Handle skill drag start from sidebar
+     */
+    handleSkillDragStart(e, imageUrl, imageName) {
         e.dataTransfer.effectAllowed = 'copy';
-        e.dataTransfer.setData('imageData', imageData);
-        e.dataTransfer.setData('imageName', imageName);
-        e.dataTransfer.setData('isSVG', isSVG);
-        
-        // Set drag image
-        const dragImage = document.createElement('div');
-        dragImage.style.width = '50px';
-        dragImage.style.height = '50px';
-        if (isSVG) {
-            dragImage.innerHTML = imageData;
-        } else {
-            const img = document.createElement('img');
-            img.src = imageData;
-            img.style.width = '100%';
-            dragImage.appendChild(img);
-        }
-        document.body.appendChild(dragImage);
+        e.dataTransfer.setData('skillUrl', imageUrl);
+        e.dataTransfer.setData('skillName', imageName);
+
+        const dragImage = document.createElement('img');
+        dragImage.src = imageUrl;
         dragImage.style.position = 'absolute';
-        dragImage.style.pointerEvents = 'none';
         dragImage.style.top = '-1000px';
-        
-        e.dataTransfer.setDragImage(dragImage, 25, 25);
-        
-        setTimeout(() => document.body.removeChild(dragImage), 0);
+        dragImage.style.left = '-1000px';
+        dragImage.style.pointerEvents = 'none';
+
+        document.body.appendChild(dragImage);
+
+        e.dataTransfer.setDragImage(dragImage, 16, 16);
+
+        setTimeout(() => {
+            dragImage.remove();
+        }, 0);
+    }
+
+    /**
+     * Change current scene background without removing placed skills
+     */
+    setScene(imageUrl, sceneName) {
+        const image = new Image();
+
+        image.onload = () => {
+            this.currentScene = {
+                name: sceneName,
+                url: imageUrl
+            };
+            this.currentSceneImage = image;
+            this.drawBackground();
+
+            document.querySelectorAll('.scene-item').forEach(item => {
+                item.classList.toggle(
+                    'active',
+                    item.querySelector('img')?.getAttribute('src') === imageUrl
+                );
+            });
+
+            this.showToast(`Scene changed to ${this.formatImageName(sceneName)}`, 'success');
+        };
+
+        image.onerror = () => {
+            this.showToast(`Could not load scene: ${sceneName}`, 'error');
+        };
+
+        image.src = imageUrl;
     }
 
     /**
      * Attach all event listeners
      */
     attachEventListeners() {
-        // Canvas drop
         this.canvasOverlay.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
@@ -183,12 +246,18 @@ class ImageEditor {
 
         this.canvasOverlay.addEventListener('drop', (e) => {
             e.preventDefault();
-            this.handleCanvasDrop(e);
-        });
 
-        // Upload
-        this.uploadBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+            const imageUrl = e.dataTransfer.getData('skillUrl');
+            const imageName = e.dataTransfer.getData('skillName');
+
+            if (!imageUrl) return;
+
+            const rect = this.canvasOverlay.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            this.addImageToCanvas(imageUrl, imageName, x, y);
+        });
 
         // Controls
         this.clearBtn.addEventListener('click', () => this.clearCanvas());
@@ -207,87 +276,59 @@ class ImageEditor {
     }
 
     /**
-     * Handle drop on canvas
+     * Add skill image to canvas
      */
-    handleCanvasDrop(e) {
-        const imageData = e.dataTransfer.getData('imageData');
-        const imageName = e.dataTransfer.getData('imageName');
-        const isSVG = e.dataTransfer.getData('isSVG') === 'true';
-
-        if (imageData) {
-            const rect = this.canvasOverlay.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            this.addImageToCanvas(imageData, imageName, x, y, isSVG);
-        }
-    }
-
-    /**
-     * Add image to canvas
-     */
-    addImageToCanvas(imageData, imageName, x, y, isSVG) {
+    addImageToCanvas(imageData, imageName, x, y) {
         const imageId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const overlayRect = this.canvasOverlay.getBoundingClientRect();
 
         const imageContainer = document.createElement('div');
         imageContainer.id = imageId;
         imageContainer.className = 'draggable-image';
-        imageContainer.style.left = `${Math.max(0, x - 50)}px`;
-        imageContainer.style.top = `${Math.max(0, y - 50)}px`;
-        imageContainer.style.width = '100px';
-        imageContainer.style.height = '100px';
 
-        // Add image/SVG
-        if (isSVG) {
-            imageContainer.innerHTML = imageData;
-        } else {
-            const img = document.createElement('img');
-            img.src = imageData;
-            img.alt = imageName;
-            imageContainer.appendChild(img);
-        }
+        const width = 64;
+        const height = 64;
+        const startX = typeof x === 'number' ? x - width / 2 : overlayRect.width / 2 - width / 2;
+        const startY = typeof y === 'number' ? y - height / 2 : overlayRect.height / 2 - height / 2;
 
-        // Create controls
+        const boundedX = Math.max(0, Math.min(startX, overlayRect.width - width));
+        const boundedY = Math.max(0, Math.min(startY, overlayRect.height - height));
+
+        imageContainer.style.left = `${boundedX}px`;
+        imageContainer.style.top = `${boundedY}px`;
+        imageContainer.style.width = `${width}px`;
+        imageContainer.style.height = `${height}px`;
+
+        const img = document.createElement('img');
+        img.src = imageData;
+        img.alt = imageName;
+        imageContainer.appendChild(img);
+
         const controlsDiv = document.createElement('div');
         controlsDiv.className = 'image-controls';
-
-        const increaseBtn = this.createControlButton('+', 'increase', () => {
-            this.resizeImage(imageId, 1.2);
-        });
-
-        const decreaseBtn = this.createControlButton('-', 'decrease', () => {
-            this.resizeImage(imageId, 0.8);
-        });
 
         const deleteBtn = this.createControlButton('✕', 'delete', () => {
             this.deleteImage(imageId);
         });
 
-        controlsDiv.appendChild(increaseBtn);
-        controlsDiv.appendChild(decreaseBtn);
         controlsDiv.appendChild(deleteBtn);
 
         imageContainer.appendChild(controlsDiv);
         this.canvasOverlay.appendChild(imageContainer);
 
-        // Store image data
         this.draggableImages.set(imageId, {
             element: imageContainer,
             data: imageData,
             name: imageName,
-            width: 100,
-            height: 100,
-            x: parseInt(imageContainer.style.left),
-            y: parseInt(imageContainer.style.top),
-            isSVG: isSVG
+            width,
+            height,
+            x: boundedX,
+            y: boundedY
         });
 
-        // Attach drag listeners
         this.attachImageDragListeners(imageId);
-
-        // Select new image
         this.selectImage(imageId);
-        this.showToast(`Added ${imageName} to canvas`, 'success');
+        this.showToast(`Added ${this.formatImageName(imageName)}`, 'success');
     }
 
     /**
@@ -312,6 +353,7 @@ class ImageEditor {
 
         const startDrag = (e) => {
             if (e.target.closest('.image-controls')) return;
+            e.preventDefault();
             this.selectImage(imageId);
             this.startDragImage(e, imageId);
         };
@@ -321,8 +363,7 @@ class ImageEditor {
             this.selectImage(imageId);
         };
 
-        element.addEventListener('mousedown', startDrag);
-        element.addEventListener('touchstart', startDrag);
+        element.addEventListener('pointerdown', startDrag);
         element.addEventListener('click', handleClick);
     }
 
@@ -356,64 +397,59 @@ class ImageEditor {
      */
     startDragImage(e, imageId) {
         const data = this.draggableImages.get(imageId);
-        const rect = data.element.getBoundingClientRect();
-        const overlayRect = this.canvasOverlay.getBoundingClientRect();
+        if (!data) return;
 
-        const startX = (e.clientX || e.touches?.[0].clientX) - rect.left;
-        const startY = (e.clientY || e.touches?.[0].clientY) - rect.top;
+        const elementRect = data.element.getBoundingClientRect();
+        const pointerX = e.clientX;
+        const pointerY = e.clientY;
 
-        this.dragOffset = { x: startX, y: startY };
+        this.dragOffset = {
+            x: pointerX - elementRect.left,
+            y: pointerY - elementRect.top
+        };
+
+        data.element.setPointerCapture?.(e.pointerId);
+        data.element.classList.add('dragging');
 
         const handleMove = (moveEvent) => {
-            const clientX = moveEvent.clientX || moveEvent.touches?.[0].clientX;
-            const clientY = moveEvent.clientY || moveEvent.touches?.[0].clientY;
+            moveEvent.preventDefault();
 
-            if (!clientX || !clientY) return;
+            const overlayRect = this.canvasOverlay.getBoundingClientRect();
 
-            const x = clientX - overlayRect.left - this.dragOffset.x;
-            const y = clientY - overlayRect.top - this.dragOffset.y;
+            const x = moveEvent.clientX - overlayRect.left - this.dragOffset.x;
+            const y = moveEvent.clientY - overlayRect.top - this.dragOffset.y;
 
             const boundedX = Math.max(0, Math.min(x, overlayRect.width - data.width));
             const boundedY = Math.max(0, Math.min(y, overlayRect.height - data.height));
 
-            data.element.style.left = `${boundedX}px`;
-            data.element.style.top = `${boundedY}px`;
-            data.x = boundedX;
-            data.y = boundedY;
-            data.element.classList.add('dragging');
+            data.element.style.transform = `translate3d(${boundedX - data.x}px, ${boundedY - data.y}px, 0)`;
+
+            data.pendingX = boundedX;
+            data.pendingY = boundedY;
         };
 
-        const handleEnd = () => {
-            document.removeEventListener('mousemove', handleMove);
-            document.removeEventListener('mouseup', handleEnd);
-            document.removeEventListener('touchmove', handleMove);
-            document.removeEventListener('touchend', handleEnd);
-            
-            if (data) {
-                data.element.classList.remove('dragging');
+        const handleEnd = (endEvent) => {
+            document.removeEventListener('pointermove', handleMove);
+            document.removeEventListener('pointerup', handleEnd);
+            document.removeEventListener('pointercancel', handleEnd);
+
+            if (typeof data.pendingX === 'number' && typeof data.pendingY === 'number') {
+                data.x = data.pendingX;
+                data.y = data.pendingY;
+                data.element.style.left = `${data.x}px`;
+                data.element.style.top = `${data.y}px`;
+                data.element.style.transform = '';
+                delete data.pendingX;
+                delete data.pendingY;
             }
+
+            data.element.releasePointerCapture?.(endEvent.pointerId);
+            data.element.classList.remove('dragging');
         };
 
-        document.addEventListener('mousemove', handleMove);
-        document.addEventListener('mouseup', handleEnd);
-        document.addEventListener('touchmove', handleMove, { passive: false });
-        document.addEventListener('touchend', handleEnd);
-    }
-
-    /**
-     * Resize image
-     */
-    resizeImage(imageId, factor) {
-        const data = this.draggableImages.get(imageId);
-        if (!data) return;
-
-        const newWidth = Math.max(50, Math.min(400, data.width * factor));
-        const newHeight = Math.max(50, Math.min(400, data.height * factor));
-
-        data.element.style.width = `${newWidth}px`;
-        data.element.style.height = `${newHeight}px`;
-        data.width = newWidth;
-        data.height = newHeight;
+        document.addEventListener('pointermove', handleMove, { passive: false });
+        document.addEventListener('pointerup', handleEnd);
+        document.addEventListener('pointercancel', handleEnd);
     }
 
     /**
@@ -427,77 +463,82 @@ class ImageEditor {
             if (this.selectedImage === imageId) {
                 this.selectedImage = null;
             }
-            this.showToast(`Removed ${data.name}`, 'info');
+            this.showToast(`Removed ${this.formatImageName(data.name)}`, 'info');
         }
     }
 
     /**
-     * Clear all images
+     * Clear all skill images
      */
     clearCanvas() {
         if (this.draggableImages.size === 0) {
-            this.showToast('Canvas is already empty', 'info');
             return;
         }
 
-        if (confirm('Clear all images from canvas?')) {
-            this.draggableImages.forEach((data) => {
-                data.element.remove();
-            });
-            this.draggableImages.clear();
-            this.selectedImage = null;
-            this.showToast('Canvas cleared', 'success');
-        }
+        this.draggableImages.forEach((data) => {
+            data.element.remove();
+        });
+        this.draggableImages.clear();
+        this.selectedImage = null;
+        this.showToast('Skills cleared', 'success');
     }
 
     /**
-     * Handle file upload
+     * Keep all placed skills within visible canvas area
      */
-    handleFileUpload(e) {
-        const files = Array.from(e.target.files);
-        let uploaded = 0;
+    keepAllSkillsWithinCanvas() {
+        const overlayRect = this.canvasOverlay.getBoundingClientRect();
 
-        files.forEach(file => {
-            if (file.type.startsWith('image/') && file.size < 5 * 1024 * 1024) {
-                const reader = new FileReader();
+        this.draggableImages.forEach((data) => {
+            data.x = Math.max(0, Math.min(data.x, overlayRect.width - data.width));
+            data.y = Math.max(0, Math.min(data.y, overlayRect.height - data.height));
 
-                reader.onload = (event) => {
-                    const imageName = file.name.split('.')[0];
-                    this.addImageToLibrary(imageName, event.target.result, false);
-                    uploaded++;
-                };
-
-                reader.onerror = () => {
-                    this.showToast(`Error loading ${file.name}`, 'error');
-                };
-
-                reader.readAsDataURL(file);
-            } else if (file.size >= 5 * 1024 * 1024) {
-                this.showToast(`${file.name} is too large (max 5MB)`, 'error');
-            }
+            data.element.style.left = `${data.x}px`;
+            data.element.style.top = `${data.y}px`;
         });
-
-        if (uploaded > 0) {
-            this.showToast(`Uploaded ${uploaded} image(s)`, 'success');
-        }
-
-        this.fileInput.value = '';
     }
 
     /**
      * Download composition
      */
-    downloadComposition() {
-        if (this.draggableImages.size === 0) {
-            this.showToast('Add images before downloading', 'info');
-            return;
+    async downloadComposition() {
+        const outputCanvas = document.createElement('canvas');
+        outputCanvas.width = this.canvas.width;
+        outputCanvas.height = this.canvas.height;
+
+        const ctx = outputCanvas.getContext('2d');
+        ctx.drawImage(this.canvas, 0, 0);
+
+        const overlayRect = this.canvasOverlay.getBoundingClientRect();
+        const scaleX = outputCanvas.width / overlayRect.width;
+        const scaleY = outputCanvas.height / overlayRect.height;
+
+        const images = Array.from(this.draggableImages.values());
+
+        for (const item of images) {
+            await new Promise((resolve) => {
+                const image = new Image();
+                image.onload = () => {
+                    ctx.drawImage(
+                        image,
+                        item.x * scaleX,
+                        item.y * scaleY,
+                        item.width * scaleX,
+                        item.height * scaleY
+                    );
+                    resolve();
+                };
+                image.onerror = resolve;
+                image.src = item.data;
+            });
         }
 
         const link = document.createElement('a');
-        link.download = `composition-${new Date().toISOString().slice(0, 10)}.png`;
-        link.href = this.canvas.toDataURL('image/png');
+        link.download = `horntail-planner-${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = outputCanvas.toDataURL('image/png');
         link.click();
-        this.showToast('Composition downloaded!', 'success');
+
+        this.showToast('Planner image downloaded!', 'success');
     }
 
     /**
@@ -506,9 +547,11 @@ class ImageEditor {
     copyCompositionData() {
         const data = {
             timestamp: new Date().toISOString(),
-            images: Array.from(this.draggableImages.entries()).map(([id, img]) => ({
-                id: id,
+            scene: this.currentScene,
+            skills: Array.from(this.draggableImages.entries()).map(([id, img]) => ({
+                id,
                 name: img.name,
+                src: img.data,
                 x: img.x,
                 y: img.y,
                 width: img.width,
@@ -517,11 +560,11 @@ class ImageEditor {
         };
 
         const jsonString = JSON.stringify(data, null, 2);
-        
+
         navigator.clipboard.writeText(jsonString).then(() => {
-            this.showToast('Composition data copied to clipboard!', 'success');
+            this.showToast('Planner data copied to clipboard!', 'success');
         }).catch(() => {
-            this.showToast('Failed to copy (use manual copy)', 'error');
+            this.showToast('Failed to copy planner data', 'error');
         });
     }
 
@@ -531,26 +574,22 @@ class ImageEditor {
     handleKeyboardShortcuts(e) {
         if (!this.selectedImage) return;
 
-        switch(e.key) {
+        switch (e.key) {
             case 'Delete':
             case 'Backspace':
                 e.preventDefault();
                 this.deleteImage(this.selectedImage);
                 break;
-            case '+':
-            case '=':
-                e.preventDefault();
-                this.resizeImage(this.selectedImage, 1.1);
-                break;
-            case '-':
-            case '_':
-                e.preventDefault();
-                this.resizeImage(this.selectedImage, 0.9);
-                break;
             case 'Escape':
                 this.deselectImage();
                 break;
         }
+    }
+
+    formatImageName(fileName) {
+        return fileName
+            .replace(/\.[^/.]+$/, '')
+            .replace(/[_-]/g, ' ');
     }
 
     /**
@@ -562,92 +601,6 @@ class ImageEditor {
         setTimeout(() => {
             this.toast.classList.remove('show');
         }, 3000);
-    }
-
-    /**
-     * SVG Image Generators (no external images needed)
-     */
-
-    createMountainSVG() {
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="mountainGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#8B7355;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#654321;stop-opacity:1" />
-                </linearGradient>
-            </defs>
-            <polygon points="100,40 160,140 40,140" fill="url(#mountainGrad)"/>
-            <polygon points="60,140 100,90 140,140" fill="#A0826D"/>
-        </svg>`;
-    }
-
-    createForestSVG() {
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <rect width="200" height="200" fill="#87CEEB"/>
-            <polygon points="50,80 70,50 90,80" fill="#228B22"/>
-            <polygon points="110,90 135,55 160,90" fill="#2E8B57"/>
-            <polygon points="140,110 160,80 180,110" fill="#32CD32"/>
-            <rect x="45" y="80" width="10" height="30" fill="#8B4513"/>
-            <rect x="130" y="90" width="12" height="40" fill="#8B4513"/>
-        </svg>`;
-    }
-
-    createOceanSVG() {
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#87CEEB;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#1E90FF;stop-opacity:1" />
-                </linearGradient>
-            </defs>
-            <rect width="200" height="200" fill="url(#oceanGrad)"/>
-            <path d="M 0 80 Q 50 70 100 80 T 200 80" stroke="#4169E1" stroke-width="3" fill="none"/>
-            <path d="M 0 120 Q 50 110 100 120 T 200 120" stroke="#1E90FF" stroke-width="2" fill="none"/>
-            <circle cx="160" cy="40" r="15" fill="#FFD700" opacity="0.8"/>
-        </svg>`;
-    }
-
-    createDesertSVG() {
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="desertGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#FFE4B5;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#DEB887;stop-opacity:1" />
-                </linearGradient>
-            </defs>
-            <rect width="200" height="200" fill="url(#desertGrad)"/>
-            <ellipse cx="50" cy="160" rx="40" ry="20" fill="#D2B48C"/>
-            <ellipse cx="150" cy="140" rx="50" ry="25" fill="#D2B48C"/>
-            <circle cx="180" cy="30" r="20" fill="#FFD700"/>
-            <polygon points="80,100 90,80 100,100" fill="#228B22"/>
-        </svg>`;
-    }
-
-    createSunsetSVG() {
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="sunsetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#FF6347;stop-opacity:1" />
-                    <stop offset="50%" style="stop-color:#FFD700;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#4B0082;stop-opacity:1" />
-                </linearGradient>
-            </defs>
-            <rect width="200" height="200" fill="url(#sunsetGrad)"/>
-            <circle cx="100" cy="100" r="35" fill="#FF8C00" opacity="0.9"/>
-            <polygon points="20,180 100,120 180,180" fill="#000080" opacity="0.6"/>
-        </svg>`;
-    }
-
-    createSnowSVG() {
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-            <rect width="200" height="200" fill="#E0FFFF"/>
-            <circle cx="100" cy="80" r="30" fill="#FFFFFF" stroke="#E0F6FF" stroke-width="2"/>
-            <circle cx="70" cy="120" r="20" fill="#F0F8FF"/>
-            <circle cx="130" cy="130" r="25" fill="#F0F8FF"/>
-            <circle cx="100" cy="160" r="15" fill="#E0FFFF" stroke="#87CEEB" stroke-width="1"/>
-            <circle cx="50" cy="50" r="8" fill="#FFFFFF" opacity="0.7"/>
-            <circle cx="160" cy="70" r="6" fill="#FFFFFF" opacity="0.7"/>
-        </svg>`;
     }
 }
 
