@@ -9,8 +9,15 @@ class ImageEditor {
         // Canvas & DOM elements
         this.canvas = document.getElementById('canvas');
         this.canvasOverlay = document.getElementById('canvasOverlay');
+        
         this.sceneList = document.getElementById('sceneList');
+        this.decreaseSceneSizeBtn = document.getElementById('decreaseSceneSizeBtn');
+        this.increaseSceneSizeBtn = document.getElementById('increaseSceneSizeBtn');
+        
         this.skillList = document.getElementById('skillList');
+        this.decreaseSkillSizeBtn = document.getElementById('decreaseSkillSizeBtn');
+        this.increaseSkillSizeBtn = document.getElementById('increaseSkillSizeBtn');
+        
         this.clearBtn = document.getElementById('clearBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
         this.toast = document.getElementById('toast');
@@ -22,7 +29,12 @@ class ImageEditor {
         this.dragOffset = { x: 0, y: 0 };
         this.currentScene = null;
         this.currentSceneImage = null;
+        
+        this.sceneZoom = 1;
+        this.sceneZoomResize = [0.5, 0.75, 1, 1.25, 1.5, 2];
+        
         this.skillSize = 48;
+        this.skillResize = [24,36,48,60];
 
         this.scenePath = './imgs/scenes/';
         this.skillPath = './imgs/skills/';
@@ -131,7 +143,7 @@ class ImageEditor {
             availableWidth / image.naturalWidth,
             availableHeight / image.naturalHeight,
             1
-        );
+        ) * this.sceneZoom;
 
         const nextWidth = Math.floor(image.naturalWidth * this.sceneScale);
         const nextHeight = Math.floor(image.naturalHeight * this.sceneScale);
@@ -365,6 +377,23 @@ class ImageEditor {
         });
 
         // Controls
+        this.decreaseSceneSizeBtn.addEventListener('click', () => {
+            this.changeSceneSize(false);
+        });
+
+        this.increaseSceneSizeBtn.addEventListener('click', () => {
+            this.changeSceneSize(true);
+        });
+
+        this.decreaseSkillSizeBtn.addEventListener('click', () => {
+            this.changeSkillSize(false);
+        });
+
+        this.increaseSkillSizeBtn.addEventListener('click', () => {
+            this.changeSkillSize(true);
+        });
+
+        // Controls
         this.clearBtn.addEventListener('click', () => this.clearCanvas());
         this.downloadBtn.addEventListener('click', () => this.downloadComposition());
 
@@ -432,6 +461,59 @@ class ImageEditor {
 
         this.attachImageDragListeners(imageId);
         this.selectImage(imageId);
+    }
+
+    changeSceneSize(isNext) {
+        const currentIndex = this.sceneZoomResize.indexOf(this.sceneZoom);
+        const safeCurrentIndex = currentIndex === -1 ? 2 : currentIndex;
+
+        if (isNext) {
+            const nextIndex = Math.min(safeCurrentIndex + 1, this.sceneZoomResize.length - 1);
+            this.sceneZoom = this.sceneZoomResize[nextIndex];
+        } else {
+            const previousIndex = Math.max(safeCurrentIndex - 1, 0);
+            this.sceneZoom = this.sceneZoomResize[previousIndex];
+        }
+
+        this.resizeCanvasToScene();
+    }
+
+    changeSkillSize(isNext) {
+        const currentIndex = this.skillResize.indexOf(this.skillSize);
+
+        if (currentIndex === -1) {
+            this.skillSize = this.skillResize[0];
+        }
+
+        if (isNext) {
+            const nextIndex = Math.min(currentIndex + 1, this.skillResize.length - 1);
+            this.skillSize = this.skillResize[nextIndex];
+        } else {
+            const previousIndex = Math.max(currentIndex - 1, 0);
+            this.skillSize = this.skillResize[previousIndex];
+        }
+
+        this.resizeAllSkillImages();
+    }
+
+    resizeAllSkillImages() {
+        const overlayRect = this.canvasOverlay.getBoundingClientRect();
+
+        this.draggableImages.forEach((data) => {
+            const centerX = data.x + data.width / 2;
+            const centerY = data.y + data.height / 2;
+
+            data.width = this.skillSize;
+            data.height = this.skillSize;
+
+            data.x = Math.max(0, Math.min(centerX - data.width / 2, overlayRect.width - data.width));
+            data.y = Math.max(0, Math.min(centerY - data.height / 2, overlayRect.height - data.height));
+
+            data.element.style.width = `${data.width}px`;
+            data.element.style.height = `${data.height}px`;
+            data.element.style.left = `${data.x}px`;
+            data.element.style.top = `${data.y}px`;
+        });
     }
 
     /**

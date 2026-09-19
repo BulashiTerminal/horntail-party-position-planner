@@ -58,7 +58,7 @@ body {
     width: 100%;
     display: grid;
     grid-template-columns: minmax(90px, 130px) 1fr;
-    gap: 8px;
+    gap: 5%;
     align-items: start;
     padding: 6px 8px;
     overflow: visible;
