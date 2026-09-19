@@ -42,7 +42,9 @@ class ImageEditor {
         this.sceneFiles = [
             '002-right_head.png',
             "003-horntail.png",
-            '004-horntail-with-mob.png'
+            '004-horntail-with-mob.png',
+            '005-tree.png',
+            '006-cleantree.png'
         ];
 
         this.skillFiles = [
@@ -718,7 +720,7 @@ class ImageEditor {
         }
 
         const link = document.createElement('a');
-        link.download = `horntail-planner-${new Date().toISOString().slice(0, 10)}.png`;
+        link.download = `artale-raid-planner-${this.currentScene.name}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = outputCanvas.toDataURL('image/png');
         link.click();
 
